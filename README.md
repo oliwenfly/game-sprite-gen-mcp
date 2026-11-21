@@ -7,10 +7,14 @@
 ## 3 步开始用
 
 > **注意：全文示例路径 `D:/game-sprite-gen-mcp` 只是举例，不是固定值。请把它替换成你自己实际放源码的目录，其他地方不用改。**
+>
+> **另一个硬性前提：本机必须已经安装 Python 3.10+**，详见第 1 步。
 
 ### 1. 下载源码
 
-下载或解压到任意目录，例如 `D:/game-sprite-gen-mcp`。要求 Python 3.10+。
+下载或解压到任意目录，例如 `D:/game-sprite-gen-mcp`。
+
+> **硬性前提：本机必须已安装 Python 3.10+。** 源码不带 Python，入口脚本只会自动安装依赖包，不会安装 Python 本身。没装的话先去 https://www.python.org/downloads/ 下载安装，安装时勾选 **Add Python to PATH**。装完在命令行运行 `python --version`（macOS / Linux 用 `python3 --version`），能显示 3.10 以上的版本号就可以继续。
 
 > **记住这个路径**，第 3 步的 MCP 配置里要原样填上它。
 

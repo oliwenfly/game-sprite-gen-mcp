@@ -7,10 +7,14 @@ Turn a single prompt into usable **sprite-sheet animation assets**: generate an 
 ## 3 steps
 
 > **The path `D:/game-sprite-gen-mcp` used throughout this guide is only an example, not a fixed value. Replace it with the directory where you actually put the source; nothing else needs changing.**
+>
+> **Also required: Python 3.10+ must already be installed on your machine.** See step 1.
 
 ### 1. Download the source
 
-Unzip it anywhere, e.g. `D:/game-sprite-gen-mcp`. Requires Python 3.10+.
+Unzip it anywhere, e.g. `D:/game-sprite-gen-mcp`.
+
+> **Requirement: Python 3.10+ must already be installed.** Python is not bundled with the source, and the entry script only installs dependency packages — it does not install Python itself. If needed, download it from https://www.python.org/downloads/ and check **Add Python to PATH** during installation. Verify with `python --version` (`python3 --version` on macOS/Linux); it must print 3.10 or later before you continue.
 
 > **Remember this path** — you need it in step 3's MCP config.
 

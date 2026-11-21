@@ -23,15 +23,8 @@ CONFIG_NAMES = ("spritegen.json", "config.json")
 
 
 def _search_dirs() -> list[Path]:
-    """配置文件查找目录：当前目录优先，其次兜底到源码仓库根目录。
-
-    MCP 客户端拉起进程时，工作目录不一定是项目目录，因此多找一层。
-    """
-    dirs = [Path.cwd()]
-    repo_root = Path(__file__).resolve().parents[2]
-    if (repo_root / "pyproject.toml").is_file() and repo_root not in dirs:
-        dirs.append(repo_root)
-    return dirs
+    """配置文件查找目录：当前目录。入口脚本会通过 SPRITEGEN_CONFIG 显式指定。"""
+    return [Path.cwd()]
 
 
 def config_path() -> Path | None:
@@ -49,7 +42,7 @@ def config_path() -> Path | None:
 
 def config_hint() -> str:
     """配置文件缺失时给用户的落地指引。"""
-    target = _search_dirs()[-1] / "config.json"
+    target = config_path() or _search_dirs()[-1] / "config.json"
     return (
         f"未找到配置文件 {target}：请新建 config.json（内容参考 config.example.json），"
         "或把 config.example.json 改名为 config.json，然后填写 apiKey"

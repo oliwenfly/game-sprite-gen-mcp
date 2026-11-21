@@ -1,0 +1,10 @@
+{
+  "baseUrl": "https://api.openai.com",
+  "model": "gpt-image-2",
+  "editModel": "gpt-image-2",
+  "quality": "auto",
+  "apiKey": "",
+  "outDir": "generated/sprites",
+  "timeoutMs": 180000,
+  "transparent": false
+}

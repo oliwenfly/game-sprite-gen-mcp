@@ -1,0 +1,25 @@
+# 私有配置（含 API Key）
+config.json
+spritegen.json
+
+# 生成产物
+generated/
+images/
+out/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# OS / 编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

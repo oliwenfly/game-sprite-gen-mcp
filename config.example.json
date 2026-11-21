@@ -1,7 +1,6 @@
 {
   "baseUrl": "https://api.openai.com",
   "model": "gpt-image-2.5",
-  "editModel": "gpt-image-2.5",
   "quality": "auto",
   "apiKey": "",
   "outDir": "generated/sprites",

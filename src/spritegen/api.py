@@ -114,14 +114,14 @@ class ImageClient:
             mime = _MIME.get(fmt.upper(), "application/octet-stream")
             files.append(("image", (path.name, data, mime)))
 
-        data_fields: dict[str, str] = {"model": self.settings.edit_model, "prompt": prompt}
+        data_fields: dict[str, str] = {"model": self.settings.model, "prompt": prompt}
         if size:
             data_fields["size"] = size
 
         endpoint = f"{self.settings.api_base}/v1/images/edits"
         with httpx.Client(timeout=self._timeout(), follow_redirects=True) as client:
             resp = client.post(endpoint, data=data_fields, files=files, headers=self._headers(json_body=False))
-        return self._collect(resp, endpoint, self.settings.edit_model)
+        return self._collect(resp, endpoint, self.settings.model)
 
     @staticmethod
     def _collect(resp: httpx.Response, endpoint: str, model: str) -> tuple[list[bytes], str]:

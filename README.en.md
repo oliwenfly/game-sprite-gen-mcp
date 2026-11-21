@@ -26,7 +26,6 @@ If there is no `config.json` in the source directory, create one using `config.e
 {
   "baseUrl": "https://api.openai.com",
   "model": "gpt-image-2.5",
-  "editModel": "gpt-image-2.5",
   "quality": "auto",
   "apiKey": "sk-your-key",
   "outDir": "generated/sprites",
@@ -40,7 +39,6 @@ If there is no `config.json` in the source directory, create one using `config.e
 | `apiKey` | empty | Image API key, required |
 | `baseUrl` | `https://api.openai.com` | API base URL; any OpenAI-compatible image gateway works |
 | `model` | `gpt-image-2.5` | Generation model |
-| `editModel` | `gpt-image-2.5` | Model used when editing with reference images |
 | `quality` | `auto` | Quality parameter, e.g. `low` / `medium` / `high` / `auto` |
 | `outDir` | `generated/sprites` | Default output directory; relative paths are resolved from the source directory, and tool calls can override it with `out_dir` |
 | `timeoutMs` | `180000` | Per-request timeout in milliseconds |
@@ -48,7 +46,7 @@ If there is no `config.json` in the source directory, create one using `config.e
 
 With `transparent: true`, requests include `background: "transparent"` (and force `output_format: "png"`), so the model returns images with alpha and local background removal is skipped. Supported by gpt-image-2.5 and later; older models or third-party gateways may reject it — keep `false` in that case and rely on local background removal.
 
-Optional overrides via environment variables: `SPRITEGEN_API_KEY`, `SPRITEGEN_BASE_URL`, `SPRITEGEN_MODEL`, `SPRITEGEN_EDIT_MODEL`, `SPRITEGEN_QUALITY`, `SPRITEGEN_TIMEOUT_MS`, `SPRITEGEN_TRANSPARENT`. Normally unnecessary.
+Optional overrides via environment variables: `SPRITEGEN_API_KEY`, `SPRITEGEN_BASE_URL`, `SPRITEGEN_MODEL`, `SPRITEGEN_QUALITY`, `SPRITEGEN_TIMEOUT_MS`, `SPRITEGEN_TRANSPARENT`. Normally unnecessary.
 
 `config.json` is in `.gitignore` and is never committed.
 

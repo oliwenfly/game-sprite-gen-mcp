@@ -11,7 +11,6 @@ from typing import Any
 DEFAULTS = {
     "baseUrl": "https://api.openai.com",
     "model": "gpt-image-2.5",
-    "editModel": "gpt-image-2.5",
     "quality": "auto",
     "outDir": "generated/sprites",
     "timeoutMs": 180000,
@@ -81,7 +80,6 @@ class Settings:
     api_key: str
     base_url: str
     model: str
-    edit_model: str
     quality: str
     out_dir: str
     root_dir: Path
@@ -119,7 +117,6 @@ def load_settings(root: str | Path | None = None) -> Settings:
         api_key=str(env.get("SPRITEGEN_API_KEY") or user.get("apiKey") or ""),
         base_url=str(env.get("SPRITEGEN_BASE_URL") or user.get("baseUrl") or DEFAULTS["baseUrl"]),
         model=str(env.get("SPRITEGEN_MODEL") or user.get("model") or DEFAULTS["model"]),
-        edit_model=str(env.get("SPRITEGEN_EDIT_MODEL") or user.get("editModel") or DEFAULTS["editModel"]),
         quality=str(env.get("SPRITEGEN_QUALITY") or user.get("quality") or DEFAULTS["quality"]),
         out_dir=str(user.get("outDir") or DEFAULTS["outDir"]),
         root_dir=Path(root_value).expanduser().resolve(),

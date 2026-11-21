@@ -26,7 +26,6 @@
 {
   "baseUrl": "https://api.openai.com",
   "model": "gpt-image-2.5",
-  "editModel": "gpt-image-2.5",
   "quality": "auto",
   "apiKey": "sk-你的Key",
   "outDir": "generated/sprites",
@@ -40,7 +39,6 @@
 | `apiKey` | 空 | 生图 API Key，必填 |
 | `baseUrl` | `https://api.openai.com` | 接口根地址，支持任意 OpenAI 兼容的生图网关 |
 | `model` | `gpt-image-2.5` | 生图模型 |
-| `editModel` | `gpt-image-2.5` | 用参考图改图时使用的模型 |
 | `quality` | `auto` | 质量参数，如 `low` / `medium` / `high` / `auto` |
 | `outDir` | `generated/sprites` | 默认输出目录，相对路径以源码目录为基准；工具调用也可传 `out_dir` 覆盖 |
 | `timeoutMs` | `180000` | 单次请求超时，单位毫秒 |
@@ -48,7 +46,7 @@
 
 `transparent: true` 会在请求里带 `background: "transparent"`（并强制 `output_format: "png"`），模型直接出透明图，本地去背自动跳过。gpt-image-2.5 及之后支持；旧模型或第三方网关可能不支持该参数而报错，此时保持 `false`，走本地去背兜底。
 
-也可以用环境变量临时覆盖：`SPRITEGEN_API_KEY`、`SPRITEGEN_BASE_URL`、`SPRITEGEN_MODEL`、`SPRITEGEN_EDIT_MODEL`、`SPRITEGEN_QUALITY`、`SPRITEGEN_TIMEOUT_MS`、`SPRITEGEN_TRANSPARENT`。一般不用配。
+也可以用环境变量临时覆盖：`SPRITEGEN_API_KEY`、`SPRITEGEN_BASE_URL`、`SPRITEGEN_MODEL`、`SPRITEGEN_QUALITY`、`SPRITEGEN_TIMEOUT_MS`、`SPRITEGEN_TRANSPARENT`。一般不用配。
 
 `config.json` 在 `.gitignore` 里，不会被提交。
 

@@ -9,6 +9,7 @@ spritegen.json
 
 # 生成产物
 generated/
+generated/sprites/
 images/
 out/
 artifacts/

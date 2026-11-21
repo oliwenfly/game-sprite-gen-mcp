@@ -17,7 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "src"
 CONFIG = ROOT / "config.json"
-PACKAGES = ("mcp>=1.2.0", "pillow>=10.0", "httpx>=0.27")
+PACKAGES = ("mcp>=2", "pillow>=10.0", "httpx>=0.27")
 
 
 def _log(message: str) -> None:
@@ -36,7 +36,7 @@ def _prepare() -> None:
 
 def _deps_ready() -> bool:
     try:
-        import mcp  # noqa: F401
+        from mcp.server.mcpserver import MCPServer  # noqa: F401
         import httpx  # noqa: F401
         from PIL import Image  # noqa: F401
     except ImportError:

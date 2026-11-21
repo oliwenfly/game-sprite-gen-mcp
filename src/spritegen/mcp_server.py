@@ -6,8 +6,8 @@ import io
 import json
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
-from mcp.server.fastmcp import Image as MCPImage
+from mcp.server.mcpserver import Image as MCPImage
+from mcp.server.mcpserver import MCPServer
 from PIL import Image as PILImage
 
 from . import imageops
@@ -17,7 +17,7 @@ from .inspect import inspect_grid, quality_issues
 from .pipeline import SpritePipeline
 from .sheet import BuildOptions, SheetBuilder, split_grid
 
-mcp = FastMCP("spritegen")
+mcp = MCPServer("spritegen")
 
 
 def _dump(data: object) -> str:
@@ -72,7 +72,7 @@ def _with_preview(payload: dict, path: Path | None) -> list:
     return content
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def generate_image(
     prompt: str,
     size: str | None = None,
@@ -96,7 +96,7 @@ def generate_image(
     return _with_preview(payload, paths[0])
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def edit_image(
     prompt: str,
     images: list[str],
@@ -119,7 +119,7 @@ def edit_image(
     return _with_preview(payload, paths[0])
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def build_spritesheet(
     inputs: list[str],
     cols: int = 2,
@@ -170,7 +170,7 @@ def build_spritesheet(
     return _with_preview(payload, result.contact or result.spritesheet)
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def inspect_spritesheet(
     image: str,
     cols: int,
@@ -186,7 +186,7 @@ def inspect_spritesheet(
     return _dump({"ok": not issues, "issues": issues, **report.as_dict()})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def remove_background(image: str, output: str | None = None, tolerance: int = 18) -> str:
     """Remove a flat solid background by flood-filling from the four corners with tolerance, keeping interior pixels that share the color. Returns the output path."""
     settings = _settings()
@@ -198,7 +198,7 @@ def remove_background(image: str, output: str | None = None, tolerance: int = 18
     return _dump({"source": str(source), "output": str(target), "size": list(img.size)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def generate_animation(
     prompt: str,
     cols: int = 4,

@@ -1,179 +1,111 @@
 # game-sprite-gen-mcp
 
-用任意 OpenAI 兼容的生图接口，从一句提示词直接产出可用的**序列帧动画素材**：自动生成网格序列帧、去背、逐格质检、不合格自动重试，最后输出对齐好的瓦片图、单帧、manifest 与 GIF 预览。
+一句提示词，直接生成可用的**序列帧动画素材**：自动出网格图、去背、逐格质检、不合格重试，最后导出对齐好的瓦片图、单帧、manifest 和 GIF 预览。通过 MCP 让 AI 客户端直接调用，不用你自己启动任何服务。
 
-同时提供 **MCP server** 和 **CLI**，既可以让 AI 客户端直接调用，也可以当普通命令行工具用。
+![fox_hit 序列帧瓦片图](example-fox-hit.png)
 
-## 处理流程
+## 3 步开始用
 
-```
-提示词 → 生图（N×M 网格） → 去背（出图自带透明时自动跳过） → 逐格质检
-                                   ├─ 通过 → 拆帧 → 统一缩放 → 锚点对齐 → 锁轮廓 → 调色板 → 合图导出
-                                   └─ 不通过 → 自动重试（最多 retries 次）
-```
+> **注意：全文示例路径 `D:/game-sprite-gen-mcp` 只是举例，不是固定值。请把它替换成你自己实际放源码的目录，其他地方不用改。**
 
-## 安装
+### 1. 下载源码
 
-```bash
-git clone <repo>
-cd game-sprite-gen-mcp
-pip install -e .
-```
+下载或解压到任意目录，例如 `D:/game-sprite-gen-mcp`。要求 Python 3.10+。
 
-安装后得到两个命令：`spritegen`（CLI）与 `spritegen-mcp`（MCP server）。
+> **记住这个路径**，第 3 步的 MCP 配置里要原样填上它。
 
-## 配置
+### 2. 修改配置
 
-复制示例并填写：
-
-```bash
-cp config.example.json config.json
-```
+源码目录下如果没有 `config.json`，新建一个（内容参考 `config.example.json`），或者直接把 `config.example.json` 改名为 `config.json`，然后按下面说明修改。必填的只有 `apiKey`，其余字段都有默认值。
 
 ```json
 {
   "baseUrl": "https://api.openai.com",
-  "model": "gpt-image-1",
-  "editModel": "gpt-image-1",
+  "model": "gpt-image-2.5",
+  "editModel": "gpt-image-2.5",
   "quality": "auto",
-  "apiKey": "sk-...",
+  "apiKey": "sk-你的Key",
   "outDir": "generated/sprites",
   "timeoutMs": 180000,
   "transparent": false
 }
 ```
 
-优先级：**环境变量 > 配置文件 > 默认值**。配置文件按 `SPRITEGEN_CONFIG` → `./spritegen.json` → `./config.json` 顺序查找。
+| 字段 | 默认值 | 说明 |
+| --- | --- | --- |
+| `apiKey` | 空 | 生图 API Key，必填 |
+| `baseUrl` | `https://api.openai.com` | 接口根地址，支持任意 OpenAI 兼容的生图网关 |
+| `model` | `gpt-image-2.5` | 生图模型 |
+| `editModel` | `gpt-image-2.5` | 用参考图改图时使用的模型 |
+| `quality` | `auto` | 质量参数，如 `low` / `medium` / `high` / `auto` |
+| `outDir` | `generated/sprites` | 默认输出目录，相对路径以源码目录为基准；工具调用也可传 `out_dir` 覆盖 |
+| `timeoutMs` | `180000` | 单次请求超时，单位毫秒 |
+| `transparent` | `false` | 模型是否直接返回透明 PNG，详见下方说明 |
 
-| 环境变量 | 说明 |
-| --- | --- |
-| `SPRITEGEN_API_KEY` | 生图 API Key |
-| `SPRITEGEN_BASE_URL` | 接口根地址，如 `https://api.openai.com` |
-| `SPRITEGEN_MODEL` | 生图模型 |
-| `SPRITEGEN_EDIT_MODEL` | 改图模型 |
-| `SPRITEGEN_QUALITY` | 质量参数，如 `low` / `medium` / `high` / `auto` |
-| `SPRITEGEN_OUT_DIR` | 未指定 `--out` 时的输出子目录 |
-| `SPRITEGEN_ROOT` | 相对路径的基准目录，默认为当前目录 |
-| `SPRITEGEN_TIMEOUT_MS` | 单次请求超时，默认 180000 |
-| `SPRITEGEN_TRANSPARENT` | 模型是否支持直接生成透明 PNG，`true` / `false` |
+`transparent: true` 会在请求里带 `background: "transparent"`（并强制 `output_format: "png"`），模型直接出透明图，本地去背自动跳过。gpt-image-2.5 及之后支持；旧模型或第三方网关可能不支持该参数而报错，此时保持 `false`，走本地去背兜底。
 
-`transparent` 开启后，请求会带上 `background: "transparent"`（并强制 `output_format: "png"`），模型直接返回带 alpha 的图，本地去背自动跳过。gpt-image-2.5 及之后的模型支持；旧模型或第三方网关可能不支持该参数，会直接报错，此时保持 `false` 用本地去背兜底。
+也可以用环境变量临时覆盖：`SPRITEGEN_API_KEY`、`SPRITEGEN_BASE_URL`、`SPRITEGEN_MODEL`、`SPRITEGEN_EDIT_MODEL`、`SPRITEGEN_QUALITY`、`SPRITEGEN_TIMEOUT_MS`、`SPRITEGEN_TRANSPARENT`。一般不用配。
 
-`config.json` 已在 `.gitignore` 中，不会被提交。
+`config.json` 在 `.gitignore` 里，不会被提交。
 
-## 作为 MCP server 使用
+### 3. 把这段粘到 AI 客户端的 MCP 配置里
 
 ```json
 {
   "mcpServers": {
     "spritegen": {
-      "command": "spritegen-mcp",
-      "env": {
-        "SPRITEGEN_API_KEY": "sk-...",
-        "SPRITEGEN_BASE_URL": "https://api.openai.com",
-        "SPRITEGEN_MODEL": "gpt-image-1"
-      }
+      "command": "python",
+      "args": ["D:/game-sprite-gen-mcp/mcp_server.py"]
     }
   }
 }
 ```
 
-### 可用工具
+**只需要改 `args` 里的路径**：把示例中的 `D:/game-sprite-gen-mcp` 换成你第 1 步实际放源码的目录，其他原样照抄。
+
+- Windows：`command` 写 `python`
+- macOS / Linux：`command` 写 `python3`
+
+重启 AI 客户端，然后直接对 AI 说：
+
+> 用 spritegen 生成 4 帧狐狸奔跑的序列帧，透明背景，名字叫 fox_run
+
+第一次启动时入口脚本会自动安装 `mcp`、`pillow`、`httpx` 三个依赖（需联网，十几秒），以后不会再装。如果自动安装失败，它会把手动安装的命令打印出来。**不要手动运行这个脚本**，AI 客户端会自己拉起进程，关掉客户端进程就结束。
+
+配置只认源码目录里的 `config.json`，改完立即生效，不用重启服务。
+
+## AI 能调用的工具
 
 | 工具 | 说明 |
 | --- | --- |
-| `generate_animation` | **一步到位**：生图 → 去背 → 质检 → 重试 → 合图，返回瓦片图与 manifest |
-| `build_spritesheet` | 把已有网格图构建成对齐图集（不调生图接口） |
-| `inspect_spritesheet` | 逐格质检，返回 bbox、尺寸、中心、空帧与偏差 JSON |
-| `remove_background` | 去纯色背景（四角洪水填充，保留内部同色像素） |
+| `generate_animation` | **一步到位**：生图 → 去背 → 逐格质检 → 重试 → 合图，返回瓦片图和 manifest |
+| `build_spritesheet` | 把已有网格图做成对齐图集（不调用生图接口） |
+| `inspect_spritesheet` | 逐格质检，返回 bbox、尺寸、中心、空帧和偏差 JSON |
+| `remove_background` | 去除纯色背景（四角洪水填充，保留内部同色像素） |
 | `generate_image` | 纯生图，返回文件路径与尺寸 |
-| `edit_image` | 以本地图片为参考图改图，适合保持角色一致 |
+| `edit_image` | 用本地图片作参考改图，适合保持角色一致 |
 
-工具返回文本 JSON，同时附带联系图或瓦片图的预览，客户端可直接看到结果。
+工具返回文本 JSON，并附带预览图，AI 客户端里能直接看到结果。
 
-## CLI
+## 产物在哪
 
-```bash
-# 一步生成：4×2 = 8 帧，带质检重试
-spritegen generate "a small fox running, flat cartoon style" \
-  --cols 4 --rows 2 --name fox_run --out out/fox_run --retries 1 --fps 8
-
-# 只处理已有网格图
-spritegen build work/sheet.png --cols 2 --rows 2 --out out/fox --name fox --fps 8
-
-# 质检
-spritegen inspect out/fox/spritesheet.png --cols 8 --rows 1 --json
-
-# 去背 / 裁边 / 无缝图
-spritegen remove-bg raw.png --tolerance 18
-spritegen trim raw.png tight.png --pad 4 --max-side 512
-spritegen seamless bg.png tiled.png --w 1920 --h 1080 --top 120
-```
-
-`generate` 常用参数：
-
-| 参数 | 默认 | 说明 |
-| --- | --- | --- |
-| `--cols` / `--rows` | 4 / 2 | 网格列数与行数，帧数 = 两者乘积 |
-| `--retries` | 1 | 质检不通过时的重试次数（**每次重试都会真实计费**） |
-| `--anchor` | bottom | `bottom` 脚底对齐，`center` 包围盒中心对齐 |
-| `--target-h` | 0 | 统一缩放目标高度，0 表示按最大包围盒自适应 |
-| `--palette` | 0 | 统一调色板颜色数，0 表示不量化 |
-| `--gutter` | 4 | 瓦片图帧间隔，避免采样泄漏 |
-| `--keep-bg` | 关 | 保留原背景，不去背 |
-| `--no-gif` | 关 | 不导出 GIF 预览 |
-| `--json` | 关 | 以 JSON 输出完整结果 |
-
-## 输出产物
+不传 `out_dir` 时，产物写到源码目录下的 `generated/sprites/`；也可以在工具参数里传绝对路径改到别处。
 
 ```
-out/fox_run/
+generated/sprites/fox_run/
   source.png       去背后的原始网格图
   frame-0.png ...  对齐后的单帧
   spritesheet.png  横向瓦片图
-  contact.png      4 列联系图，便于目视检查
+  contact.png      联系图，便于目视检查
   preview.gif      GIF 预览（透明区域压白底）
-  manifest.json    引擎无关的图集描述
+  manifest.json    引擎无关的图集描述，pivot 可直接用作锚点
 ```
-
-`manifest.json`：
-
-```json
-{
-  "name": "fox_run",
-  "image": "spritesheet.png",
-  "frame_count": 8,
-  "frame_width": 256,
-  "frame_height": 256,
-  "image_width": 2048,
-  "image_height": 264,
-  "gutter": 4,
-  "pivot": { "x": 128, "y": 256 },
-  "fps": 8,
-  "loop": true,
-  "anchor": "bottom",
-  "frames": [{ "index": 0, "x": 4, "y": 4, "w": 256, "h": 256 }]
-}
-```
-
-`pivot` 是脚底中心，可直接作为 Godot `AtlasTexture`、Unity Sprite 或自研引擎的锚点。
-
-## 质检与重试
-
-每格计算 alpha 包围盒，判定三类问题：
-
-- **空帧**：某格没有不透明像素
-- **尺寸偏差**：帧宽/帧高的 `(max-min)/中位数` 超过 `--max-deviation`（默认 20%）
-- **背景未去除**：内容包围盒铺满整格（说明去背失败，通常伴随整格边缘接触）
-
-不通过时会把「一格一角色、不要空帧、尺寸一致」的强调追加到提示词后重试。取所有尝试中问题最少的一张，所以重试不会让结果变差。
 
 ## 已知限制
 
-- 帧间一致性完全依赖生图模型。复杂动作、多帧序列仍可能需要在 `edit_image` 里逐帧修正。
-- 去背是纯色键控：渐变背景、带阴影的背景无法完全去除，可先把背景提示词强调为「flat uniform single-color」。模型支持透明输出时（`transparent: true`）不会走这一步。
-- 透明通道支持取决于网关。支持 `background: "transparent"` 的模型可以直接出透明图，本项目的本地去背作为兜底。
-- GIF 预览会把透明区域压成白色，仅用于检查，不是最终交付格式。
+- 帧间一致性取决于生图模型；复杂动作可能还是要用 `edit_image` 逐帧修正。
+- 去背是纯色键控，渐变背景和带阴影的背景去不干净；可让提示词强调 `flat uniform single-color`。
+- GIF 预览把透明区域压成白色，仅用于检查，不是交付格式。
 
 ## License
 

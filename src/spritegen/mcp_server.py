@@ -12,7 +12,7 @@ from PIL import Image as PILImage
 
 from . import imageops
 from .api import ImageClient, save_images
-from .config import load_settings
+from .config import Settings, config_hint, load_settings
 from .inspect import inspect_grid, quality_issues
 from .pipeline import SpritePipeline
 from .sheet import BuildOptions, SheetBuilder, split_grid
@@ -22,6 +22,14 @@ mcp = FastMCP("spritegen")
 
 def _dump(data: object) -> str:
     return json.dumps(data, ensure_ascii=False, indent=2)
+
+
+def _settings() -> Settings:
+    """加载配置；用户还没创建 config.json 时直接提示，而不是继续请求接口。"""
+    settings = load_settings()
+    if settings.config_file is None and not settings.api_key:
+        raise RuntimeError(config_hint())
+    return settings
 
 
 def _resolve(path: str, root: Path) -> Path:
@@ -72,7 +80,7 @@ def generate_image(
     out_dir: str | None = None,
 ) -> list:
     """Generate 1-4 images from a text prompt with the configured OpenAI-compatible image API and save them to disk, returning file paths and pixel sizes."""
-    settings = load_settings()
+    settings = _settings()
     settings.require_key()
     blobs, model = ImageClient(settings).generate(
         prompt.strip(), size=size, n=max(1, min(n, 4))
@@ -96,7 +104,7 @@ def edit_image(
     out_dir: str | None = None,
 ) -> list:
     """Edit or restyle existing local images with a text prompt, uploading them as references. Use it to keep a character consistent across poses."""
-    settings = load_settings()
+    settings = _settings()
     settings.require_key()
     sources = _collect(images, settings.root_dir)
     blobs, model = ImageClient(settings).edit(prompt.strip(), sources, size=size)
@@ -129,7 +137,7 @@ def build_spritesheet(
     gif: bool = True,
 ) -> list:
     """Assemble an existing grid image (or several) into an aligned sprite sheet: split cells, uniform scale, anchor alignment, outline locking, palette quantization, then export spritesheet.png, frames, manifest.json and a GIF preview."""
-    settings = load_settings()
+    settings = _settings()
     files = _collect(inputs, settings.root_dir)
     frames: list[PILImage.Image] = []
     for path in files:
@@ -171,7 +179,7 @@ def inspect_spritesheet(
     max_deviation: float = 0.2,
 ) -> str:
     """Inspect a grid sprite sheet cell by cell: alpha bounding boxes, per-frame size, centers, empty cells and size deviation. Returns JSON with the detected problems."""
-    settings = load_settings()
+    settings = _settings()
     path = _resolve(image, settings.root_dir)
     report = inspect_grid(PILImage.open(path), cols, rows, gutter=gutter)
     issues = quality_issues(report, max_deviation)
@@ -181,7 +189,7 @@ def inspect_spritesheet(
 @mcp.tool()
 def remove_background(image: str, output: str | None = None, tolerance: int = 18) -> str:
     """Remove a flat solid background by flood-filling from the four corners with tolerance, keeping interior pixels that share the color. Returns the output path."""
-    settings = load_settings()
+    settings = _settings()
     source = _resolve(image, settings.root_dir)
     target = _resolve(output, settings.root_dir) if output else source.with_name(f"{source.stem}-nobg.png")
     img = imageops.remove_solid_background(PILImage.open(source), tolerance=tolerance)
@@ -208,7 +216,7 @@ def generate_animation(
     size: str | None = None,
 ) -> list:
     """End-to-end sprite animation generation: build a grid prompt, generate the sheet, remove the background, inspect every cell, retry when cells are empty or inconsistent, then export spritesheet.png, frames, manifest.json and a GIF preview."""
-    pipeline = SpritePipeline()
+    pipeline = SpritePipeline(settings=_settings())
     options = BuildOptions(
         cols=cols,
         rows=rows,

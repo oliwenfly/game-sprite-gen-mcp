@@ -10,8 +10,8 @@ from typing import Any
 
 DEFAULTS = {
     "baseUrl": "https://api.openai.com",
-    "model": "gpt-image-1",
-    "editModel": "gpt-image-1",
+    "model": "gpt-image-2.5",
+    "editModel": "gpt-image-2.5",
     "quality": "auto",
     "outDir": "generated/sprites",
     "timeoutMs": 180000,
@@ -22,16 +22,38 @@ CONFIG_ENV = "SPRITEGEN_CONFIG"
 CONFIG_NAMES = ("spritegen.json", "config.json")
 
 
+def _search_dirs() -> list[Path]:
+    """配置文件查找目录：当前目录优先，其次兜底到源码仓库根目录。
+
+    MCP 客户端拉起进程时，工作目录不一定是项目目录，因此多找一层。
+    """
+    dirs = [Path.cwd()]
+    repo_root = Path(__file__).resolve().parents[2]
+    if (repo_root / "pyproject.toml").is_file() and repo_root not in dirs:
+        dirs.append(repo_root)
+    return dirs
+
+
 def config_path() -> Path | None:
-    """定位配置文件：SPRITEGEN_CONFIG 指定路径，否则在当前目录按约定名查找。"""
+    """定位配置文件：SPRITEGEN_CONFIG 指定路径，否则在约定目录按约定名查找。"""
     explicit = os.environ.get(CONFIG_ENV)
     if explicit:
         return Path(explicit).expanduser()
-    for name in CONFIG_NAMES:
-        candidate = Path.cwd() / name
-        if candidate.is_file():
-            return candidate
+    for directory in _search_dirs():
+        for name in CONFIG_NAMES:
+            candidate = directory / name
+            if candidate.is_file():
+                return candidate
     return None
+
+
+def config_hint() -> str:
+    """配置文件缺失时给用户的落地指引。"""
+    target = _search_dirs()[-1] / "config.json"
+    return (
+        f"未找到配置文件 {target}：请新建 config.json（内容参考 config.example.json），"
+        "或把 config.example.json 改名为 config.json，然后填写 apiKey"
+    )
 
 
 def _read_config() -> dict[str, Any]:
@@ -83,18 +105,17 @@ class Settings:
         """校验 API Key 已配置，否则给出明确的配置指引。"""
         if self.api_key:
             return
-        where = self.config_file or "spritegen.json"
-        raise RuntimeError(
-            "没有配置图片 API Key：设置环境变量 SPRITEGEN_API_KEY，"
-            f"或把 config.example.json 复制为 {where} 并填写 apiKey"
-        )
+        if self.config_file is None:
+            raise RuntimeError(config_hint())
+        raise RuntimeError(f"配置文件 {self.config_file} 中没有 apiKey：请填写后重试")
 
 
 def load_settings(root: str | Path | None = None) -> Settings:
     """按优先级合并配置。"""
     user = _read_config()
     env = os.environ
-    root_value = env.get("SPRITEGEN_ROOT") or user.get("rootDir") or root or Path.cwd()
+    config_file = config_path()
+    root_value = root or (config_file.parent if config_file else Path.cwd())
     env_transparent = env.get("SPRITEGEN_TRANSPARENT")
     transparent = (
         _as_bool(env_transparent)
@@ -110,6 +131,6 @@ def load_settings(root: str | Path | None = None) -> Settings:
         out_dir=str(user.get("outDir") or DEFAULTS["outDir"]),
         root_dir=Path(root_value).expanduser().resolve(),
         timeout_s=float(env.get("SPRITEGEN_TIMEOUT_MS") or user.get("timeoutMs") or DEFAULTS["timeoutMs"]) / 1000.0,
-        config_file=config_path(),
+        config_file=config_file,
         transparent=transparent,
     )

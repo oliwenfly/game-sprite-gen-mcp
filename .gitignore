@@ -1,25 +1,55 @@
 # 私有配置（含 API Key）
 config.json
 spritegen.json
+.env
+.env.*
+!.env.example
+*.pem
+*.key
 
 # 生成产物
 generated/
 images/
 out/
+artifacts/
+tmp/
+temp/
+*.log
+logs/
 
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
 .venv/
 venv/
+env/
+ENV/
 build/
 dist/
 *.egg-info/
+.eggs/
+*.egg
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.pyre/
+.pytype/
+.tox/
+.nox/
+
+# 测试 / 覆盖率
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
 # OS / 编辑器
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
+*.swp
+*~

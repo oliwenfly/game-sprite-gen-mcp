@@ -87,7 +87,9 @@ class SheetBuilder:
         """用所有帧最大包围盒高度推导统一缩放比，保证帧间比例一致。"""
         if not self.frames:
             return 1.0
+        # 用所有帧中最大的包围盒高度作为基准，保证缩放后角色身体比例帧间一致。
         max_h = max(bottom - top for _, top, _, bottom in self.bboxes) or 1
+        # target_h=0 表示不缩放，沿用模型原始尺寸。
         scale = self.opts.target_h / max_h if self.opts.target_h > 0 else 1.0
         if scale != 1.0:
             self.frames = [
@@ -109,13 +111,16 @@ class SheetBuilder:
         aligned = []
         for frame, bbox in zip(self.frames, self.bboxes):
             if self.opts.anchor == "bottom":
+                # 走路/跑步等动作以脚底为基准，避免上下“飘”。
                 cx = self._foot_center_x(frame, bbox)
                 ay = bbox[3]
                 canvas_ay = self.canvas_h - self.opts.pad
             else:
+                # 中心对齐适合旋转、飞行类动作。
                 cx = (bbox[0] + bbox[2]) * 0.5
                 ay = (bbox[1] + bbox[3]) * 0.5
                 canvas_ay = self.canvas_h * 0.5
+            # 计算让锚点落到统一画布目标位置的平移量。
             dx = round(self.canvas_w * 0.5 - cx)
             dy = round(canvas_ay - ay)
             canvas = Image.new("RGBA", (self.canvas_w, self.canvas_h), (0, 0, 0, 0))
@@ -150,6 +155,7 @@ class SheetBuilder:
             return
         base = self.frames[0]
         base_alpha = base.getchannel("A").point(lambda v: 255 if v > self.opts.thresh else 0)
+        # 对第 1 帧 alpha 做膨胀再减去自身，得到一圈“外扩边缘”区域。
         dilated = base_alpha.filter(ImageFilter.MaxFilter(self.opts.feather * 2 + 1))
         edge = ImageChops.subtract(dilated, base_alpha)
         base_rgb = base.convert("RGB")
@@ -166,6 +172,7 @@ class SheetBuilder:
         """把所有帧量化到同一套 N 色调色板。"""
         if self.opts.palette <= 0 or not self.frames:
             return
+        # 先把所有帧纵向拼成一张图，再整体量化，保证每帧使用同一套颜色。
         combined = Image.new("RGB", (self.frames[0].width, self.frames[0].height * len(self.frames)))
         for index, frame in enumerate(self.frames):
             combined.paste(frame.convert("RGB"), (0, index * frame.height))
@@ -186,8 +193,10 @@ class SheetBuilder:
         height = self.canvas_h + self.opts.gutter * 2
         sheet = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         for index, frame in enumerate(self.frames):
+            # 先做边缘颜色外扩，再做缩放时就不会把透明像素混成黑边。
             bled = self._bleed_edges(frame, radius=2)
             x = self.opts.gutter + index * (self.canvas_w + self.opts.gutter)
+            # 每帧单独贴到透明层再合成，避免 alpha 叠加出现暗边。
             layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
             layer.paste(bled, (x, self.opts.gutter))
             sheet = Image.alpha_composite(sheet, layer)
@@ -268,6 +277,7 @@ class SheetBuilder:
         if not self.frames:
             return
         duration = max(20, round(1000 / max(1, self.opts.fps)))
+        # GIF 不支持半透明，先压到白底；disposal=2 表示每帧重置画布，避免残影。
         images = [flatten(frame) for frame in self.frames]
         options: dict = {
             "save_all": True,

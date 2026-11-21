@@ -14,6 +14,7 @@ from .inspect import GridReport, inspect_grid, quality_issues
 from .sheet import BuildOptions, BuildResult, SheetBuilder, split_grid
 
 PROMPT_TEMPLATE = (
+    # 把网格结构、每格完整性、一致性和纯色背景一次性写清，减少模型自由发挥。
     "Sprite sheet with exactly {frames} frames of the same character, "
     "arranged in a grid of {cols} columns and {rows} rows, equal cell size, "
     "full body visible in every cell, identical scale and identical style in every cell, "
@@ -21,6 +22,7 @@ PROMPT_TEMPLATE = (
     "no shadow between cells."
 )
 
+# 首次生成不合格时追加的强化提示，重点约束空格、居中和大小一致。
 RETRY_HINT = (
     " This time pay special attention to: exactly one complete character centered in each cell, "
     "no empty cells, and the same character size in every cell."
@@ -109,6 +111,7 @@ class SpritePipeline:
         for attempt in range(max(0, retries) + 1):
             attempts = attempt + 1
             text = self.compose_prompt(prompt, cols, rows)
+            # 重试时追加更明确的约束，引导模型修正空格与尺寸不一致问题。
             if attempt > 0:
                 text += RETRY_HINT
             blobs, model = self.client.generate(text, size=size, n=1, background=background)
@@ -116,6 +119,7 @@ class SpritePipeline:
             image = imageops.remove_solid_background(base) if remove_bg else base
             report = inspect_grid(image, cols, rows, thresh=opts.thresh)
             issues = quality_issues(report, max_deviation)
+            # 记录问题数最少的一版，即使最终都不合格也输出其中最好的结果。
             if best is None or len(issues) < len(best[2]):
                 best = (image, report, issues, model)
             if not issues:
@@ -123,6 +127,7 @@ class SpritePipeline:
 
         assert best is not None
         image, report, issues, model = best
+        # 保留去背后的原始网格图，方便后续追溯或重新构建。
         source = target / "source.png"
         image.save(source)
 

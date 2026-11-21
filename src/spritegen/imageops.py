@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PIL import Image, ImageChops, ImageDraw
 
+# 洪水填充的标记色：用极少出现在角色上的品红，填充后刚好可作为“背景”掩码。
 MARKER = (255, 0, 255)
 
 
@@ -34,10 +35,12 @@ def remove_solid_background(img: Image.Image, tolerance: int = 18) -> Image.Imag
         (rgb.width - 1, rgb.height - 1),
     ]
     for xy in corners:
+        # 有的角本身已被前一角填充覆盖，跳过以免重复填充标记色。
         if rgb.getpixel(xy) == MARKER:
             continue
         ImageDraw.floodfill(rgb, xy, MARKER, thresh=tolerance)
 
+    # 与标记色做差：全黑处就是被填充的背景，转成 alpha=0，其余保留 alpha=255。
     marker = Image.new("RGB", rgb.size, MARKER)
     alpha = ImageChops.difference(rgb, marker).convert("L").point(lambda v: 0 if v == 0 else 255)
     rgba.putalpha(alpha)
@@ -47,6 +50,7 @@ def remove_solid_background(img: Image.Image, tolerance: int = 18) -> Image.Imag
 def trim_alpha(img: Image.Image, pad: int = 0, max_side: int = 0, thresh: int = 0) -> Image.Image | None:
     """按 alpha 裁掉空白边界，可选留边与限制最大边长。没有不透明像素时返回 None。"""
     rgba = img.convert("RGBA")
+    # 先把 alpha 二值化再求包围盒，避免半透明羽化像素干扰裁边边界。
     mask = rgba.getchannel("A").point(lambda v: 255 if v > thresh else 0)
     bbox = mask.getbbox()
     if not bbox:
@@ -66,6 +70,7 @@ def make_seamless(img: Image.Image, out_size: tuple[int, int] | None = None, top
     """左半部分与其镜像拼接成左右可平铺的图，可选缩放到目标尺寸并在顶部留空。"""
     rgba = img.convert("RGBA")
     w, h = rgba.size
+    # 取左半部分和它的水平镜像拼成整图，左右边缘的像素因此天然衔接。
     half = rgba.crop((0, 0, w // 2, h))
     mirrored = Image.new("RGBA", (w, h))
     mirrored.paste(half, (0, 0))

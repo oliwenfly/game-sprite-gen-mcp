@@ -21,6 +21,7 @@ mcp = MCPServer("spritegen")
 
 
 def _dump(data: object) -> str:
+    """统一 JSON 输出格式，保留中文与可读缩进。"""
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
@@ -82,6 +83,7 @@ def generate_image(
     """Generate 1-4 images from a text prompt with the configured OpenAI-compatible image API and save them to disk, returning file paths and pixel sizes."""
     settings = _settings()
     settings.require_key()
+    # 接口对单次生成数量有上限，这里收敛到 1-4 张。
     blobs, model = ImageClient(settings).generate(
         prompt.strip(), size=size, n=max(1, min(n, 4))
     )

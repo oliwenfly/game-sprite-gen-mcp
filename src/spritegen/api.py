@@ -11,6 +11,7 @@ from PIL import Image
 
 from .config import Settings
 
+# 部分第三方网关会拦截默认的 python-httpx UA，这里伪装成浏览器规避 403。
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
 
 _MIME = {"PNG": "image/png", "JPEG": "image/jpeg", "GIF": "image/gif", "WEBP": "image/webp"}
@@ -81,6 +82,7 @@ class ImageClient:
             "prompt": prompt,
             "quality": self.settings.quality,
         }
+        # 配置开启透明背景且调用方未显式指定时，默认向接口要透明图。
         if background is None and self.settings.transparent:
             background = "transparent"
         if size:
@@ -89,6 +91,7 @@ class ImageClient:
             payload["n"] = n
         if background:
             payload["background"] = background
+            # 透明背景只有 PNG 支持 alpha，未指定格式时自动补上。
             if background == "transparent" and not output_format:
                 output_format = "png"
         if output_format:
@@ -107,6 +110,7 @@ class ImageClient:
         size: str | None = None,
     ) -> tuple[list[bytes], str]:
         """以参考图改图，返回图片字节列表与模型名。"""
+        # 接口要求 multipart 上传，按文件头魔数推断 MIME，避免后缀与实际格式不符。
         files = []
         for path in images:
             data = path.read_bytes()
@@ -144,6 +148,7 @@ def save_images(blobs: list[bytes], directory: Path, prefix: str = "img") -> lis
     from datetime import datetime
 
     directory.mkdir(parents=True, exist_ok=True)
+    # 时间戳精确到秒，同一批次的多张图再用序号区分，避免互相覆盖。
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     saved = []
     for index, data in enumerate(blobs):

@@ -17,6 +17,7 @@ DEFAULTS = {
     "transparent": False,
 }
 
+# 允许用环境变量显式指定配置文件，入口脚本就是靠它把 config.json 定死。
 CONFIG_ENV = "SPRITEGEN_CONFIG"
 CONFIG_NAMES = ("spritegen.json", "config.json")
 
@@ -106,8 +107,10 @@ def load_settings(root: str | Path | None = None) -> Settings:
     user = _read_config()
     env = os.environ
     config_file = config_path()
+    # 未显式传入 root 时，以配置文件所在目录作为输出根目录，保证产物落在项目内。
     root_value = root or (config_file.parent if config_file else Path.cwd())
     env_transparent = env.get("SPRITEGEN_TRANSPARENT")
+    # 环境变量存在时以它为准，否则才读配置文件，对应“环境变量 > 配置文件 > 默认值”。
     transparent = (
         _as_bool(env_transparent)
         if env_transparent is not None

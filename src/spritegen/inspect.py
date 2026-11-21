@@ -105,7 +105,9 @@ def inspect_grid(
             height = bottom - top
             widths.append(width)
             heights.append(height)
+            # 内容贴到格子边缘说明角色被切到或没有居中，可能影响对齐。
             touches = left <= 1 or top <= 1 or right >= cw - 1 or bottom >= ch - 1
+            # 几乎铺满整格通常意味着背景没去掉，而不是角色真的这么大。
             if width >= cw * 0.98 and height >= ch * 0.98:
                 full += 1
             cells.append(

@@ -150,22 +150,23 @@ class SheetBuilder:
         return (min(xs) + max(xs)) * 0.5
 
     def apply_lock_outline(self) -> None:
-        """以第 1 帧的 alpha 为基准蒙版，把边缘区域回填第 1 帧颜色，抑制轮廓抖动。"""
+        """以第 1 帧轮廓内侧的边缘颜色为基准，回填其余帧相同位置，抑制轮廓抖动。
+
+        只取第 1 帧不透明区的颜色，且不改变任何帧的 alpha，避免透明像素被强制
+        置为不透明而出现黑块。"""
         if not self.opts.lock_outline or len(self.frames) < 2:
             return
         base = self.frames[0]
         base_alpha = base.getchannel("A").point(lambda v: 255 if v > self.opts.thresh else 0)
-        # 对第 1 帧 alpha 做膨胀再减去自身，得到一圈“外扩边缘”区域。
-        dilated = base_alpha.filter(ImageFilter.MaxFilter(self.opts.feather * 2 + 1))
-        edge = ImageChops.subtract(dilated, base_alpha)
+        # 取轮廓内侧的一圈边缘：该处第 1 帧一定不透明，颜色有效，不会带入透明区的黑色。
+        size = self.opts.feather * 2 + 1
+        edge = ImageChops.subtract(base_alpha, base_alpha.filter(ImageFilter.MinFilter(size)))
         base_rgb = base.convert("RGB")
         locked = [base]
         for frame in self.frames[1:]:
-            out = frame.copy()
-            out_rgb = out.convert("RGB")
+            out_rgb = frame.convert("RGB")
             out_rgb.paste(base_rgb, None, edge)
-            merged_alpha = Image.composite(out.getchannel("A"), base.getchannel("A"), edge)
-            locked.append(Image.merge("RGBA", (*out_rgb.split(), merged_alpha)))
+            locked.append(Image.merge("RGBA", (*out_rgb.split(), frame.getchannel("A"))))
         self.frames = locked
 
     def quantize_palette(self) -> None:

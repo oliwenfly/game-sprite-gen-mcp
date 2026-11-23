@@ -17,6 +17,13 @@ DEFAULTS = {
     "transparent": False,
 }
 
+# transparent 为真时追加到提示词末尾：透明通道靠提示词要求模型直出，不走接口参数。
+TRANSPARENT_PROMPT = (
+    "The background must be fully transparent with a real alpha channel: "
+    "no backdrop, no floor, no ground, no cast shadow, no border and no frame, "
+    "and the subject edges must stay clean with no white halo."
+)
+
 # 允许用环境变量显式指定配置文件，入口脚本就是靠它把 config.json 定死。
 CONFIG_ENV = "SPRITEGEN_CONFIG"
 CONFIG_NAMES = ("spritegen.json", "config.json")
@@ -102,6 +109,21 @@ class Settings:
         raise RuntimeError(f"配置文件 {self.config_file} 中没有 apiKey：请填写后重试")
 
 
+def resolve_out_dir(settings: Settings) -> Path:
+    """产物目录：只认配置里的 outDir，留空落到默认目录；调用方无权改产物路径。"""
+    raw = (settings.out_dir or "").strip() or DEFAULTS["outDir"]
+    path = Path(raw).expanduser()
+    return path if path.is_absolute() else settings.root_dir / path
+
+
+def with_transparent_hint(prompt: str, settings: Settings) -> str:
+    """transparent 为真时在提示词末尾补上透明背景要求，否则原样返回。"""
+    head = prompt.strip()
+    if not settings.transparent:
+        return head
+    return f"{head} {TRANSPARENT_PROMPT}" if head else TRANSPARENT_PROMPT
+
+
 def load_settings(root: str | Path | None = None) -> Settings:
     """按优先级合并配置。"""
     user = _read_config()
@@ -116,12 +138,13 @@ def load_settings(root: str | Path | None = None) -> Settings:
         if env_transparent is not None
         else _as_bool(user.get("transparent"))
     )
+    configured_out_dir = str(user.get("outDir") or "").strip()
     return Settings(
         api_key=str(env.get("SPRITEGEN_API_KEY") or user.get("apiKey") or ""),
         base_url=str(env.get("SPRITEGEN_BASE_URL") or user.get("baseUrl") or DEFAULTS["baseUrl"]),
         model=str(env.get("SPRITEGEN_MODEL") or user.get("model") or DEFAULTS["model"]),
         quality=str(env.get("SPRITEGEN_QUALITY") or user.get("quality") or DEFAULTS["quality"]),
-        out_dir=str(user.get("outDir") or DEFAULTS["outDir"]),
+        out_dir=configured_out_dir or DEFAULTS["outDir"],
         root_dir=Path(root_value).expanduser().resolve(),
         timeout_s=float(env.get("SPRITEGEN_TIMEOUT_MS") or user.get("timeoutMs") or DEFAULTS["timeoutMs"]) / 1000.0,
         config_file=config_file,

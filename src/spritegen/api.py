@@ -75,23 +75,20 @@ class ImageClient:
     ) -> tuple[list[bytes], str]:
         """文生图，返回图片字节列表与模型名。
 
-        settings.transparent 为真时自动请求透明背景 PNG，返回图已带 alpha，
-        后续的本地去背会直接跳过。"""
+        透明背景由提示词要求模型直出（见 config.TRANSPARENT_PROMPT），这里不再按
+        settings.transparent 改接口参数；background / output_format 只在调用方显式传入时透传。"""
         payload: dict[str, object] = {
             "model": self.settings.model,
             "prompt": prompt,
             "quality": self.settings.quality,
         }
-        # 配置开启透明背景且调用方未显式指定时，默认向接口要透明图。
-        if background is None and self.settings.transparent:
-            background = "transparent"
         if size:
             payload["size"] = size
         if n > 1:
             payload["n"] = n
         if background:
             payload["background"] = background
-            # 透明背景只有 PNG 支持 alpha，未指定格式时自动补上。
+            # 透明背景只有 PNG 支持 alpha，显式要透明时补上输出格式。
             if background == "transparent" and not output_format:
                 output_format = "png"
         if output_format:

@@ -40,11 +40,11 @@
 | `baseUrl` | `https://api.openai.com` | 接口根地址，支持任意 OpenAI 兼容的生图网关 |
 | `model` | `gpt-image-2.5` | 生图模型 |
 | `quality` | `auto` | 质量参数，如 `low` / `medium` / `high` / `auto` |
-| `outDir` | `generated/sprites` | 默认输出目录，相对路径以源码目录为基准；工具调用也可传 `out_dir` 覆盖 |
+| `outDir` | `generated/sprites` | 产物目录，相对路径以源码目录为基准。**这是唯一的产物路径来源**，工具参数里没有输出路径入口 |
 | `timeoutMs` | `180000` | 单次请求超时，单位毫秒 |
-| `transparent` | `false` | 模型是否直接返回透明 PNG，详见下方说明 |
+| `transparent` | `false` | 是否要求模型直接产出带 alpha 通道的图，详见下方说明 |
 
-`transparent: true` 会在请求里带 `background: "transparent"`（并强制 `output_format: "png"`），模型直接出透明图，本地去背自动跳过。gpt-image-2.5 及之后支持；旧模型或第三方网关可能不支持该参数而报错，此时保持 `false`，走本地去背兜底。
+`transparent: true` 不改任何接口参数，而是把透明背景要求**写进提示词**（`config.TRANSPARENT_PROMPT`），让模型自己出带透明通道的 PNG；网格模板里的“纯色背景”也会相应换成透明背景描述。拿到的图若已带 alpha，本地去背会自动跳过；模型仍出白底时，去背兜底照常生效。
 
 也可以用环境变量临时覆盖：`SPRITEGEN_API_KEY`、`SPRITEGEN_BASE_URL`、`SPRITEGEN_MODEL`、`SPRITEGEN_QUALITY`、`SPRITEGEN_TIMEOUT_MS`、`SPRITEGEN_TRANSPARENT`。一般不用配。
 
@@ -91,7 +91,7 @@
 
 ## 产物在哪
 
-不传 `out_dir` 时，产物写到源码目录下的 `generated/sprites/`；也可以在工具参数里传绝对路径改到别处。
+产物目录只由配置里的 `outDir` 决定（示例为源码目录下的 `generated/sprites/`）；工具参数里没有输出路径这一项，调用方无法把产物写到别处。
 
 ```
 generated/sprites/fox_run/

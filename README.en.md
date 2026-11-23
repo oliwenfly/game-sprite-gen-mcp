@@ -40,11 +40,11 @@ If there is no `config.json` in the source directory, create one using `config.e
 | `baseUrl` | `https://api.openai.com` | API base URL; any OpenAI-compatible image gateway works |
 | `model` | `gpt-image-2.5` | Generation model |
 | `quality` | `auto` | Quality parameter, e.g. `low` / `medium` / `high` / `auto` |
-| `outDir` | `generated/sprites` | Default output directory; relative paths are resolved from the source directory, and tool calls can override it with `out_dir` |
+| `outDir` | `generated/sprites` | Output directory; relative paths are resolved from the source directory. **This is the only source of the output path** — the tools expose no output-path argument |
 | `timeoutMs` | `180000` | Per-request timeout in milliseconds |
-| `transparent` | `false` | Whether the model returns transparent PNGs directly (see below) |
+| `transparent` | `false` | Whether the model should return images with an alpha channel (see below) |
 
-With `transparent: true`, requests include `background: "transparent"` (and force `output_format: "png"`), so the model returns images with alpha and local background removal is skipped. Supported by gpt-image-2.5 and later; older models or third-party gateways may reject it — keep `false` in that case and rely on local background removal.
+With `transparent: true`, no request parameter changes: the transparent-background requirement is **written into the prompt** (`config.TRANSPARENT_PROMPT`) so the model itself returns a PNG with alpha. The grid template's "flat single-color background" wording is swapped for the transparent one as well. If the returned image already has alpha, local background removal is skipped; if the model still returns a flat backdrop, the removal fallback still applies.
 
 Optional overrides via environment variables: `SPRITEGEN_API_KEY`, `SPRITEGEN_BASE_URL`, `SPRITEGEN_MODEL`, `SPRITEGEN_QUALITY`, `SPRITEGEN_TIMEOUT_MS`, `SPRITEGEN_TRANSPARENT`. Normally unnecessary.
 
@@ -88,7 +88,7 @@ Tools return JSON text plus a preview image so the result is visible in the clie
 
 ## Output
 
-Without `out_dir`, files go to `generated/sprites/` inside the source directory. Pass an absolute path in the tool call to write elsewhere.
+Files go to the configured `outDir` (the example uses `generated/sprites/` inside the source directory). There is no output-path argument on the tools, so a caller cannot write anywhere else.
 
 ```
 generated/sprites/fox_run/

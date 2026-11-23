@@ -9,16 +9,23 @@ from PIL import Image
 
 from . import imageops
 from .api import ImageClient, load_image
-from .config import Settings, load_settings
+from .config import Settings, load_settings, resolve_out_dir
 from .inspect import GridReport, inspect_grid, quality_issues
 from .sheet import BuildOptions, BuildResult, SheetBuilder, split_grid
 
+# 网格模板里的背景描述：要透明通道就直接要 alpha，否则要纯色便于本地抠图。
+BACKDROP_SOLID = "flat uniform single-color background"
+BACKDROP_TRANSPARENT = (
+    "fully transparent background with a real alpha channel, no floor, no cast shadow, "
+    "no frame and clean edges without white halo"
+)
+
 PROMPT_TEMPLATE = (
-    # 把网格结构、每格完整性、一致性和纯色背景一次性写清，减少模型自由发挥。
+    # 把网格结构、每格完整性与一致性一次性写清，背景部分按 transparent 切换，减少模型自由发挥。
     "Sprite sheet with exactly {frames} frames of the same character, "
     "arranged in a grid of {cols} columns and {rows} rows, equal cell size, "
     "full body visible in every cell, identical scale and identical style in every cell, "
-    "flat uniform single-color background, no text, no watermark, no grid lines, "
+    "{backdrop}, no text, no watermark, no grid lines, "
     "no shadow between cells."
 )
 
@@ -74,9 +81,14 @@ class SpritePipeline:
         self.client = client or ImageClient(self.settings)
 
     @staticmethod
-    def compose_prompt(prompt: str, cols: int, rows: int) -> str:
-        """在用户提示词后补上网格、一致性与背景约束。"""
-        suffix = PROMPT_TEMPLATE.format(frames=cols * rows, cols=cols, rows=rows)
+    def compose_prompt(prompt: str, cols: int, rows: int, transparent: bool = False) -> str:
+        """在用户提示词后补上网格、一致性与背景约束，transparent 为真时改为要求直出透明通道。"""
+        suffix = PROMPT_TEMPLATE.format(
+            frames=cols * rows,
+            cols=cols,
+            rows=rows,
+            backdrop=BACKDROP_TRANSPARENT if transparent else BACKDROP_SOLID,
+        )
         head = prompt.strip().rstrip(".")
         return f"{head}. {suffix}" if head else suffix
 
@@ -86,14 +98,12 @@ class SpritePipeline:
         *,
         cols: int = 4,
         rows: int = 2,
-        out_dir: str | Path | None = None,
         name: str = "anim",
         options: BuildOptions | None = None,
         retries: int = 1,
         remove_bg: bool = True,
         gif: bool = True,
         size: str | None = None,
-        background: str | None = None,
         max_deviation: float = 0.2,
     ) -> AnimationResult:
         """生成一张网格图，质检不合格时重试，最后输出图集产物。"""
@@ -101,20 +111,19 @@ class SpritePipeline:
         opts = options or BuildOptions()
         opts.cols, opts.rows = cols, rows
 
-        target = Path(out_dir) if out_dir else Path(self.settings.out_dir)
-        if not target.is_absolute():
-            target = self.settings.root_dir / target
+        # 产物目录只取配置里的 outDir，调用方不能改。
+        target = resolve_out_dir(self.settings)
         target.mkdir(parents=True, exist_ok=True)
 
         best: tuple[Image.Image, GridReport, list[str], str] | None = None
         attempts = 0
         for attempt in range(max(0, retries) + 1):
             attempts = attempt + 1
-            text = self.compose_prompt(prompt, cols, rows)
+            text = self.compose_prompt(prompt, cols, rows, self.settings.transparent)
             # 重试时追加更明确的约束，引导模型修正空格与尺寸不一致问题。
             if attempt > 0:
                 text += RETRY_HINT
-            blobs, model = self.client.generate(text, size=size, n=1, background=background)
+            blobs, model = self.client.generate(text, size=size, n=1)
             base = load_image(blobs[0])
             image = imageops.remove_solid_background(base) if remove_bg else base
             report = inspect_grid(image, cols, rows, thresh=opts.thresh)

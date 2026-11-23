@@ -1,4 +1,4 @@
-"""MCP server：把生图与序列帧图集构建暴露成工具，stdio 传输。"""
+"""MCP server：把生图与序列帧图集暴露成工具，stdio 传输。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,13 @@ from PIL import Image as PILImage
 
 from . import imageops
 from .api import ImageClient, save_images
-from .config import Settings, config_hint, load_settings
+from .config import (
+    Settings,
+    config_hint,
+    load_settings,
+    resolve_out_dir,
+    with_transparent_hint,
+)
 from .inspect import inspect_grid, quality_issues
 from .pipeline import SpritePipeline
 from .sheet import BuildOptions, SheetBuilder, split_grid
@@ -78,17 +84,17 @@ def generate_image(
     prompt: str,
     size: str | None = None,
     n: int = 1,
-    out_dir: str | None = None,
 ) -> list:
-    """Generate 1-4 images from a text prompt with the configured OpenAI-compatible image API and save them to disk, returning file paths and pixel sizes."""
+    """Generate 1-4 images from a text prompt with the configured OpenAI-compatible image API and save them to disk, returning file paths and pixel sizes.
+
+    Output always goes to the outDir configured in config.json; the caller cannot choose the output path."""
     settings = _settings()
     settings.require_key()
     # 接口对单次生成数量有上限，这里收敛到 1-4 张。
     blobs, model = ImageClient(settings).generate(
-        prompt.strip(), size=size, n=max(1, min(n, 4))
+        with_transparent_hint(prompt, settings), size=size, n=max(1, min(n, 4))
     )
-    directory = _resolve(out_dir, settings.root_dir) if out_dir else settings.root_dir / settings.out_dir
-    paths = save_images(blobs, directory)
+    paths = save_images(blobs, resolve_out_dir(settings))
     payload = {
         "model": model,
         "images": [
@@ -103,15 +109,15 @@ def edit_image(
     prompt: str,
     images: list[str],
     size: str | None = None,
-    out_dir: str | None = None,
 ) -> list:
-    """Edit or restyle existing local images with a text prompt, uploading them as references. Use it to keep a character consistent across poses."""
+    """Edit or restyle existing local images with a text prompt, uploading them as references. Use it to keep a character consistent across poses.
+
+    Output always goes to the outDir configured in config.json; the caller cannot choose the output path."""
     settings = _settings()
     settings.require_key()
     sources = _collect(images, settings.root_dir)
-    blobs, model = ImageClient(settings).edit(prompt.strip(), sources, size=size)
-    directory = _resolve(out_dir, settings.root_dir) if out_dir else settings.root_dir / settings.out_dir
-    paths = save_images(blobs, directory, prefix="edit")
+    blobs, model = ImageClient(settings).edit(with_transparent_hint(prompt, settings), sources, size=size)
+    paths = save_images(blobs, resolve_out_dir(settings), prefix="edit")
     payload = {
         "model": model,
         "images": [
@@ -126,7 +132,6 @@ def build_spritesheet(
     inputs: list[str],
     cols: int = 2,
     rows: int = 2,
-    out_dir: str = "generated/sprites",
     name: str = "anim",
     anchor: str = "bottom",
     target_h: int = 0,
@@ -138,7 +143,9 @@ def build_spritesheet(
     raw: bool = False,
     gif: bool = True,
 ) -> list:
-    """Assemble an existing grid image (or several) into an aligned sprite sheet: split cells, uniform scale, anchor alignment, outline locking, palette quantization, then export spritesheet.png, frames, manifest.json and a GIF preview."""
+    """Assemble an existing grid image (or several) into an aligned sprite sheet: split cells, uniform scale, anchor alignment, outline locking, palette quantization, then export spritesheet.png, frames, manifest.json and a GIF preview.
+
+    Output always goes to the outDir configured in config.json; the caller cannot choose the output path."""
     settings = _settings()
     files = _collect(inputs, settings.root_dir)
     frames: list[PILImage.Image] = []
@@ -158,7 +165,7 @@ def build_spritesheet(
         gutter=gutter,
         raw=raw,
     )
-    result = SheetBuilder(options).build(frames, _resolve(out_dir, settings.root_dir), name, gif=gif)
+    result = SheetBuilder(options).build(frames, resolve_out_dir(settings), name, gif=gif)
     payload = {
         "frame_count": result.frame_count,
         "frame_size": list(result.frame_size),
@@ -189,11 +196,13 @@ def inspect_spritesheet(
 
 
 @mcp.tool(structured_output=False)
-def remove_background(image: str, output: str | None = None, tolerance: int = 18) -> str:
-    """Remove a flat solid background by flood-filling from the four corners with tolerance, keeping interior pixels that share the color. Returns the output path."""
+def remove_background(image: str, tolerance: int = 18) -> str:
+    """Remove a flat solid background by flood-filling from the four corners with tolerance, keeping interior pixels that share the color. Returns the output path.
+
+    Output always goes to the outDir configured in config.json; the caller cannot choose the output path."""
     settings = _settings()
     source = _resolve(image, settings.root_dir)
-    target = _resolve(output, settings.root_dir) if output else source.with_name(f"{source.stem}-nobg.png")
+    target = resolve_out_dir(settings) / f"{source.stem}-nobg.png"
     img = imageops.remove_solid_background(PILImage.open(source), tolerance=tolerance)
     target.parent.mkdir(parents=True, exist_ok=True)
     img.save(target)
@@ -206,7 +215,6 @@ def generate_animation(
     cols: int = 4,
     rows: int = 2,
     name: str = "anim",
-    out_dir: str | None = None,
     retries: int = 1,
     fps: int = 10,
     loop: bool = True,
@@ -217,7 +225,9 @@ def generate_animation(
     gif: bool = True,
     size: str | None = None,
 ) -> list:
-    """End-to-end sprite animation generation: build a grid prompt, generate the sheet, remove the background, inspect every cell, retry when cells are empty or inconsistent, then export spritesheet.png, frames, manifest.json and a GIF preview."""
+    """End-to-end sprite animation generation: build a grid prompt, generate the sheet, remove the background, inspect every cell, retry when cells are empty or inconsistent, then export spritesheet.png, frames, manifest.json and a GIF preview.
+
+    Output always goes to the outDir configured in config.json; the caller cannot choose the output path."""
     pipeline = SpritePipeline(settings=_settings())
     options = BuildOptions(
         cols=cols,
@@ -232,7 +242,6 @@ def generate_animation(
         prompt,
         cols=cols,
         rows=rows,
-        out_dir=out_dir,
         name=name,
         options=options,
         retries=retries,

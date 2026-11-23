@@ -49,7 +49,6 @@ def _cmd_generate(args: argparse.Namespace) -> None:
         args.prompt,
         cols=args.cols,
         rows=args.rows,
-        out_dir=args.out,
         name=args.name,
         options=options,
         retries=args.retries,
@@ -149,7 +148,6 @@ def _build_parser() -> argparse.ArgumentParser:
     generate.add_argument("prompt", help="角色与动作描述")
     generate.add_argument("--cols", type=int, default=4, help="网格列数")
     generate.add_argument("--rows", type=int, default=2, help="网格行数")
-    generate.add_argument("--out", help="输出目录，默认取配置中的 outDir")
     generate.add_argument("--name", default="anim", help="动作名，写入 manifest")
     generate.add_argument("--retries", type=int, default=1, help="质检不通过时的重试次数")
     generate.add_argument("--fps", type=int, default=10, help="帧率")

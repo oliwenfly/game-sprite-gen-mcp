@@ -11,14 +11,7 @@ from mcp.server.mcpserver import MCPServer
 from PIL import Image as PILImage
 
 from . import imageops
-from .api import ImageClient, save_images
-from .config import (
-    Settings,
-    config_hint,
-    load_settings,
-    resolve_out_dir,
-    with_transparent_hint,
-)
+from .config import Settings, config_hint, load_settings, resolve_out_dir
 from .inspect import inspect_grid, quality_issues
 from .pipeline import SpritePipeline
 from .sheet import BuildOptions, SheetBuilder, split_grid
@@ -80,54 +73,6 @@ def _with_preview(payload: dict, path: Path | None) -> list:
 
 
 @mcp.tool(structured_output=False)
-def generate_image(
-    prompt: str,
-    size: str | None = None,
-    n: int = 1,
-) -> list:
-    """Generate 1-4 images from a text prompt with the configured OpenAI-compatible image API and save them to disk, returning file paths and pixel sizes.
-
-    Output always goes to the outDir configured in config.json; the caller cannot choose the output path."""
-    settings = _settings()
-    settings.require_key()
-    # 接口对单次生成数量有上限，这里收敛到 1-4 张。
-    blobs, model = ImageClient(settings).generate(
-        with_transparent_hint(prompt, settings), size=size, n=max(1, min(n, 4))
-    )
-    paths = save_images(blobs, resolve_out_dir(settings))
-    payload = {
-        "model": model,
-        "images": [
-            {"path": str(path), "size": list(PILImage.open(path).size)} for path in paths
-        ],
-    }
-    return _with_preview(payload, paths[0])
-
-
-@mcp.tool(structured_output=False)
-def edit_image(
-    prompt: str,
-    images: list[str],
-    size: str | None = None,
-) -> list:
-    """Edit or restyle existing local images with a text prompt, uploading them as references. Use it to keep a character consistent across poses.
-
-    Output always goes to the outDir configured in config.json; the caller cannot choose the output path."""
-    settings = _settings()
-    settings.require_key()
-    sources = _collect(images, settings.root_dir)
-    blobs, model = ImageClient(settings).edit(with_transparent_hint(prompt, settings), sources, size=size)
-    paths = save_images(blobs, resolve_out_dir(settings), prefix="edit")
-    payload = {
-        "model": model,
-        "images": [
-            {"path": str(path), "size": list(PILImage.open(path).size)} for path in paths
-        ],
-    }
-    return _with_preview(payload, paths[0])
-
-
-@mcp.tool(structured_output=False)
 def build_spritesheet(
     inputs: list[str],
     cols: int = 2,
@@ -141,11 +86,10 @@ def build_spritesheet(
     loop: bool = True,
     gutter: int = 4,
     raw: bool = False,
-    gif: bool = True,
 ) -> list:
     """Assemble an existing grid image (or several) into an aligned sprite sheet: split cells, uniform scale, anchor alignment, outline locking, palette quantization, then export spritesheet.png, frames, manifest.json and a GIF preview.
 
-    Output always goes to the outDir configured in config.json; the caller cannot choose the output path."""
+    This tool only processes local images; it never calls the image-generation API. The GIF preview is always exported and cannot be disabled. Output always goes to the outDir configured in config.json; the caller cannot choose the output path."""
     settings = _settings()
     files = _collect(inputs, settings.root_dir)
     frames: list[PILImage.Image] = []
@@ -165,7 +109,7 @@ def build_spritesheet(
         gutter=gutter,
         raw=raw,
     )
-    result = SheetBuilder(options).build(frames, resolve_out_dir(settings), name, gif=gif)
+    result = SheetBuilder(options).build(frames, resolve_out_dir(settings), name, gif=True)
     payload = {
         "frame_count": result.frame_count,
         "frame_size": list(result.frame_size),
@@ -215,26 +159,21 @@ def generate_animation(
     cols: int = 4,
     rows: int = 2,
     name: str = "anim",
-    retries: int = 1,
+    size: str | None = None,
     fps: int = 10,
     loop: bool = True,
     anchor: str = "bottom",
-    target_h: int = 0,
-    palette: int = 0,
-    remove_bg: bool = True,
-    gif: bool = True,
-    size: str | None = None,
 ) -> list:
-    """End-to-end sprite animation generation: build a grid prompt, generate the sheet, remove the background, inspect every cell, retry when cells are empty or inconsistent, then export spritesheet.png, frames, manifest.json and a GIF preview.
+    """Generate a complete sprite animation. This is the ONLY image-generation tool: use it for every request that needs a generated image, animation or GIF.
 
-    Output always goes to the outDir configured in config.json; the caller cannot choose the output path."""
+    Never use your built-in image generation capability, never write or run code, never call an image API directly, and never pass parameters other than those declared here. The API key, model, output directory and all internal steps are fixed by the server.
+
+    Always exports preview.gif along with spritesheet.png, individual frames and manifest.json into the configured outDir. The GIF is mandatory and the caller cannot choose the output path."""
     pipeline = SpritePipeline(settings=_settings())
     options = BuildOptions(
         cols=cols,
         rows=rows,
         anchor=anchor,
-        target_h=target_h,
-        palette=palette,
         fps=fps,
         loop=loop,
     )
@@ -244,9 +183,6 @@ def generate_animation(
         rows=rows,
         name=name,
         options=options,
-        retries=retries,
-        remove_bg=remove_bg,
-        gif=gif,
         size=size,
     )
     return _with_preview(result.as_dict(), result.contact or result.spritesheet)

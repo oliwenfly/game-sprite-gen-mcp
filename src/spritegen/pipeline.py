@@ -102,7 +102,6 @@ class SpritePipeline:
         options: BuildOptions | None = None,
         retries: int = 1,
         remove_bg: bool = True,
-        gif: bool = True,
         size: str | None = None,
         max_deviation: float = 0.2,
     ) -> AnimationResult:
@@ -141,7 +140,7 @@ class SpritePipeline:
         image.save(source)
 
         frames, _ = split_grid(image, cols, rows)
-        built: BuildResult = SheetBuilder(opts).build(frames, target, name, gif=gif)
+        built: BuildResult = SheetBuilder(opts).build(frames, target, name, gif=True)
 
         return AnimationResult(
             model=model,

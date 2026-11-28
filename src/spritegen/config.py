@@ -4,9 +4,19 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+# 只保留字母、数字、下划线、连字符、点和空格；中文属于 \w，会被原样保留。
+_UNSAFE_CHARS = re.compile(r"[^\w\-. ]+", re.UNICODE)
+# Windows 保留设备名，直接当目录名会创建失败。
+_RESERVED_NAMES = {
+    "con", "prn", "aux", "nul",
+    *(f"com{i}" for i in range(1, 10)),
+    *(f"lpt{i}" for i in range(1, 10)),
+}
 
 DEFAULTS = {
     "baseUrl": "https://api.openai.com",
@@ -103,10 +113,30 @@ class Settings:
 
 
 def resolve_out_dir(settings: Settings) -> Path:
-    """产物目录：只认配置里的 outDir，留空落到默认目录；调用方无权改产物路径。"""
+    """产物根目录：只认配置里的 outDir，留空落到默认目录；调用方无权改产物路径。"""
     raw = (settings.out_dir or "").strip() or DEFAULTS["outDir"]
     path = Path(raw).expanduser()
     return path if path.is_absolute() else settings.root_dir / path
+
+
+def safe_name(name: str, fallback: str = "asset") -> str:
+    """把 name 归一化成可安全用作目录名的字符串，防止 ../ 之类逃出 outDir。"""
+    cleaned = _UNSAFE_CHARS.sub("-", str(name or "").strip())
+    # 去掉首尾的点和空格：Windows 不允许目录名以空格结尾或以点结尾。
+    cleaned = cleaned.strip(". ")
+    # 折叠连续分隔符，避免出现 "a---b" 这种难看的目录名。
+    cleaned = re.sub(r"[-_ ]{2,}", "-", cleaned)
+    if not cleaned:
+        return fallback
+    if cleaned.lower() in _RESERVED_NAMES:
+        return f"{cleaned}-asset"
+    # 目录名过长会在部分文件系统上失败，截断到 64 字符足够可读。
+    return cleaned[:64]
+
+
+def resolve_asset_dir(settings: Settings, name: str, fallback: str = "asset") -> Path:
+    """单个产物的专属目录：outDir/<name>，避免不同作品互相覆盖。"""
+    return resolve_out_dir(settings) / safe_name(name, fallback)
 
 
 def load_settings(root: str | Path | None = None) -> Settings:
